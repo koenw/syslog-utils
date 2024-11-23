@@ -3,73 +3,85 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    naersk.url = "github:nix-community/naersk";
+    fenix.url = "github:nix-community/fenix";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+  outputs = { self, nixpkgs, naersk, fenix, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
         };
 
-        rustPlatform = pkgs.makeRustPlatform {
-          cargo = pkgs.rust-bin.stable.latest.default;
-          rustc = pkgs.rust-bin.stable.latest.default;
+        toolchain = with fenix.packages.${system}; combine [
+          minimal.rustc
+          minimal.cargo
+          targets.x86_64-unknown-linux-musl.latest.rust-std
+        ];
+
+        naersk' = pkgs.callPackage naersk {};
+
+        naerskStatic = naersk.lib.${system}.override {
+          cargo = toolchain;
+          rustc = toolchain;
         };
 
-        rustPackage = rustPlatform.buildRustPackage {
-          name = "syslog-client";
+        staticPackage = naerskStatic.buildPackage {
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [
-            pkg-config
+            pkgsStatic.stdenv.cc
+            pkgsStatic.openssl
           ];
-          buildInputs = with pkgs; [
-            gcc
-            openssl
-          ];
+          CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+          # Tell Cargo to enable static compilation.
+          # (https://doc.rust-lang.org/cargo/reference/config.html#buildrustflags)
+          CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
         };
 
-        syslog-client = rustPlatform.buildRustPackage {
-          name = "syslog-client";
+        nativePackage = naersk'.buildPackage {
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            gcc
-            openssl
+            pkgsStatic.stdenv.cc
+            pkgsStatic.openssl
           ];
         };
 
-        syslog-server = rustPlatform.buildRustPackage {
+        # With explicit binary name for `nix run` (all packages contain both
+        # binaries)
+        client = naersk'.buildPackage {
+          src = ./.;
+          name = "syslog-client";
+          nativeBuildInputs = with pkgs; [
+            pkgsStatic.stdenv.cc
+            pkgsStatic.openssl
+          ];
+        };
+
+        # With explicit binary name for `nix run` (all packages contain both
+        # binaries)
+        server = naersk'.buildPackage {
+          src = ./.;
           name = "syslog-server";
-          src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-          buildInputs = with pkgs; [
-            gcc
-            openssl
+            pkgsStatic.stdenv.cc
+            pkgsStatic.openssl
           ];
         };
 
         dockerImage = pkgs.dockerTools.buildImage {
           name = "syslog-utils";
+          tag = "latest";
           config = {
-            Cmd = [ "${syslog-server}/bin/syslog-server" ];
+            Env = [
+              "PATH=${staticPackage}/bin"
+            ];
           };
         };
-      in
-      with pkgs;
-      {
-        devShells.default = mkShell {
-          buildInputs = [
+      in rec {
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
             rust-bin.stable.latest.default
             gcc
             pkg-config
@@ -87,10 +99,20 @@
         };
 
         packages = {
-          syslog-client = syslog-client;
-          syslog-server = syslog-server;
-          dockerImage = dockerImage;
-          default = syslog-client;
+          # Statically linked
+          static = staticPackage;
+          # Dynamically linked
+          native = nativePackage;
+
+          # For `nix run '.#client'`
+          client = client;
+          # For `nix run '.#server'`
+          server = server;
+          # For `nix run` or `nix run .`
+          default = client;
+
+          # The docker image contains both binaries
+          docker = dockerImage;
         };
       }
     );
