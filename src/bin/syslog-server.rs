@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use native_tls::TlsAcceptor;
 use std::io::Read;
 use std::net::TcpListener;
@@ -12,6 +12,12 @@ use syslog_loose::{parse_message, Variant};
 use utils::identity_from_files;
 use utils::Transport;
 
+/// Simple Syslog server for testing & development
+///
+/// Currently TCP and TLS transports are supported, UDP might be added in the future. Received
+/// messages will be logged to stdout. Set the environmental variable variable `SYSLOG_SERVER_LOG`
+/// to one of the values (from quiet to verbose) `error`, `warn`, `info`, `debug` or `trace` to log
+/// more or less information.
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "syslog-server",
@@ -33,12 +39,12 @@ struct Opt {
 
     /// Path to file containing TLS private key
     #[structopt(parse(from_os_str))]
-    #[structopt(long = "key", required_if("protocol", "tls"))]
+    #[structopt(long = "key", required_if("transport", "tls"))]
     private_key: Option<PathBuf>,
 
     /// Path to file containing TLS certificate
     #[structopt(parse(from_os_str))]
-    #[structopt(long = "cert", required_if("protocol", "tls"))]
+    #[structopt(long = "cert", required_if("transport", "tls"))]
     certificate: Option<PathBuf>,
 }
 
@@ -123,7 +129,7 @@ fn main() -> Result<()> {
                     Ok(tls_stream) => {
                         handle_client(tls_stream, peer);
                     }
-                    Err(e) => error!("Failed to create TLS connection with peer {peer}: {e}"),
+                    Err(e) => warn!("Failed to create TLS connection with peer {peer}: {e}"),
                 });
             }
         }

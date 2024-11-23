@@ -6,7 +6,7 @@ use structopt::StructOpt;
 
 use utils::{Format, Severity, Transport};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct SDElements(HashMap<String, String>);
 
 impl std::str::FromStr for SDElements {
@@ -24,10 +24,11 @@ impl std::str::FromStr for SDElements {
     }
 }
 
+/// Simple Syslog client
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "syslog-client",
-    about = "Syslog (network) client for diagnostic purposes",
+    about = "Syslog client for diagnostic purposes",
     setting =  structopt::clap::AppSettings::ColoredHelp,
 )]
 struct Opt {
@@ -56,7 +57,12 @@ struct Opt {
     accept_invalid_hostnames: bool,
 
     /// Message format
-    #[structopt(long, default_value = "rfc5424", case_insensitive = true)]
+    #[structopt(
+        long,
+        default_value = "rfc3164",
+        case_insensitive = true,
+        help = "Either rfc5424 or rfc3164"
+    )]
     format: Format,
 
     /// RFC5424 SD-ID (Structured Data ID)
@@ -67,9 +73,9 @@ struct Opt {
     #[structopt(long)]
     msg_id: Option<String>,
 
-    /// RFC5424 Structured Data Elements (key=value pairs)
-    #[structopt(long, default_value = "")]
-    sd_elements: SDElements,
+    /// RFC5424 Structured Data Elements, e.g. "key=value,anotherkey=anothervalue"
+    #[structopt(long, required_if("format", "rfc5424"))]
+    sd_elements: Option<SDElements>,
 
     /// Message severity
     #[structopt(long, default_value = "notice", case_insensitive = true)]
@@ -112,6 +118,7 @@ fn main() -> Result<()> {
         }
     };
 
+    let sd_elements = opt.sd_elements.unwrap_or(SDElements::default());
     let stdin_messages = opt
         .stdin
         .then_some(io::stdin().lock().lines().map_while(|line| line.ok()))
@@ -123,9 +130,17 @@ fn main() -> Result<()> {
         if let Err(e) = match &opt.format {
             Format::rfc3164 => sender.send_rfc3164(severity, line),
             Format::rfc5424 => {
-                let mut elements = SDElement::new(&opt.sd_id).unwrap();
-                for (key, value) in &opt.sd_elements.0 {
-                    elements.add_param(key, value).unwrap();
+                let mut elements = match SDElement::new(&opt.sd_id) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        eprintln!("Failed to contruct Structured Data Element. Perhaps you passed an invalid SD ID?");
+                        break;
+                    }
+                };
+                for (key, value) in &sd_elements.0 {
+                    if let Err(e) = elements.add_param(key, value) {
+                        eprintln!("Failed to parameter {key} to {value}: {e}");
+                    };
                 }
                 sender.send_rfc5424(severity, opt.msg_id.clone(), vec![elements], line)
             }

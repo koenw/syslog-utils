@@ -2,6 +2,7 @@
 name = "syslog-utils"
 version = "0.1.0"
 edition = "2021"
+default-run = "syslog-client"
 
 [lib]
 name = "utils"
@@ -13,5 +14,5 @@ fasyslog = { git = "https://github.com/koenw/fasyslog.git", rev = "805e4497b5bdc
 log = { version = "0.4.22", features = ["kv", "kv_std"] }
 native-tls = "0.2.12"
 pretty_env_logger = "0.5.0"
-structopt = { version = "0.3.26", features = ["color", "doc"] }
+structopt = { version = "0.3.26", features = ["color", "doc", "wrap_help"] }
 syslog_loose = "0.21.0"
