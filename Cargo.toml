@@ -9,8 +9,9 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.93"
-fasyslog = { git = "https://github.com/koenw/fasyslog.git", branch = "tlsConnectorBuilder", features = ["native-tls"] }
+fasyslog = { git = "https://github.com/koenw/fasyslog.git", rev = "805e4497b5bdc87acf570c69765363215946289e", features = ["native-tls"] }
 log = { version = "0.4.22", features = ["kv", "kv_std"] }
 native-tls = "0.2.12"
 pretty_env_logger = "0.5.0"
 structopt = { version = "0.3.26", features = ["color", "doc"] }
+syslog_loose = "0.21.0"

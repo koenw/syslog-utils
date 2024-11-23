@@ -68,7 +68,7 @@ struct Opt {
     msg_id: Option<String>,
 
     /// RFC5424 Structured Data Elements (key=value pairs)
-    #[structopt(long)]
+    #[structopt(long, default_value = "")]
     sd_elements: SDElements,
 
     /// Message severity

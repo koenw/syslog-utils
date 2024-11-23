@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
-use log::{debug, error, info, warn};
-use native_tls::{TlsAcceptor, TlsStream};
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use log::{debug, error, info, trace, warn};
+use native_tls::TlsAcceptor;
+use std::io::Read;
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use structopt::StructOpt;
+use syslog_loose::{parse_message, Variant};
 
 use utils::identity_from_files;
 use utils::Transport;
@@ -50,50 +51,28 @@ macro_rules! display_peer {
     };
 }
 
-fn handle_tcp_client(mut stream: TcpStream) {
-    let peer = display_peer!(stream.peer_addr());
-    info!("Accepted incoming TCP connection from {peer}");
-
-    let mut buf = [0; 1024];
+fn handle_client<S: Read>(mut stream: S, peer: String) {
+    let mut buf = [0; 16 * 1024];
     loop {
         match stream.read(&mut buf) {
             Ok(len) if len > 0 => {
-                debug!("Received {len} (plaintext) bytes from {peer}");
-                std::io::stdout().write_all(&buf[..len]).unwrap();
+                let msg_str = String::from_utf8_lossy(&buf[..len]);
+                trace!("Received {len} bytes from {peer}: {:?}", msg_str);
+                let msg = parse_message(&msg_str, Variant::Either);
+                let format = match msg.protocol {
+                    syslog_loose::Protocol::RFC3164 => "rfc3164",
+                    syslog_loose::Protocol::RFC5424(_) => "rfc5424",
+                };
+                info!("Received {format} message from {peer}: {msg}");
             }
             Ok(_) => {
-                debug!("No more bytes left to read");
-                info!("TCP Connection with {peer} closed");
+                trace!("No more bytes left to read");
+                debug!("TCP Connection with {peer} closed");
                 break;
             }
             Err(e) => {
                 warn!("Failed to read from {peer}: {e}");
-                info!("TCP Connection with {peer} closed");
-                break;
-            }
-        }
-    }
-}
-
-fn handle_tls_client(mut stream: TlsStream<TcpStream>) {
-    let peer = display_peer!(stream.get_ref().peer_addr());
-    info!("Accepted incoming TLS connection from {peer}");
-
-    let mut buf = [0; 1024];
-    loop {
-        match stream.read(&mut buf) {
-            Ok(len) if len > 0 => {
-                debug!("Received {len} (decrypted) bytes from {peer}");
-                std::io::stdout().write_all(&buf[..len]).unwrap();
-            }
-            Ok(_) => {
-                debug!("No more bytes left to read");
-                info!("TLS Connection with {peer} closed");
-                break;
-            }
-            Err(e) => {
-                warn!("Failed to read from {peer}: {e}");
-                info!("TLS Connection with {peer} closed");
+                debug!("TCP Connection with {peer} closed");
                 break;
             }
         }
@@ -104,8 +83,8 @@ fn main() -> Result<()> {
     let opt = Opt::from_args();
 
     pretty_env_logger::formatted_builder()
-        .parse_env("SYSLOG_SERVER")
         .filter(None, log::LevelFilter::Info)
+        .parse_env("SYSLOG_SERVER_LOG")
         .init();
 
     match opt.transport {
@@ -118,8 +97,10 @@ fn main() -> Result<()> {
 
             for stream in listener.incoming() {
                 let stream = stream?;
+                let peer = display_peer!(stream.peer_addr());
+                debug!("Accepted incoming TCP connection from {peer}");
                 thread::spawn(move || {
-                    handle_tcp_client(stream);
+                    handle_client(stream, peer);
                 });
             }
         }
@@ -137,9 +118,10 @@ fn main() -> Result<()> {
                 let stream = stream?;
 
                 let peer = display_peer!(stream.peer_addr());
+                debug!("Accepted incoming TLS connection from {peer}");
                 thread::spawn(move || match acceptor.accept(stream) {
                     Ok(tls_stream) => {
-                        handle_tls_client(tls_stream);
+                        handle_client(tls_stream, peer);
                     }
                     Err(e) => error!("Failed to create TLS connection with peer {peer}: {e}"),
                 });
