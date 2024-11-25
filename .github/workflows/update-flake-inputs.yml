@@ -1,0 +1,27 @@
+name: Update flake inputs
+
+on:
+  schedule:
+    - cron: '4 4 * * 1'
+
+jobs:
+  nix-flake-update:
+    name: Update flake inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+
+      - name: Install nix
+        uses: cachix/install-nix-action@v12
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix --extra-experimental-features nix-command --extra-experimental-features flakes build '.#static'
+
+      - run: nix flake update --commit-lock-file
+
+      - uses: peter-evans/create-pull-request@v3
+        with:
+          branch: bot/update
+          delete-branch: true
+          title: Update flake inputs

@@ -6,6 +6,10 @@ on:
     tags:
       - 'v*'
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   publish-release-binaries:
     name: Publish release
@@ -33,7 +37,7 @@ jobs:
         run: nix --extra-experimental-features nix-command --extra-experimental-features flakes build '.#static'
 
       - name: Copy release binaries to output directory
-        run: cp result/bin/syslog-clint result/bin/syslog-server output
+        run: cp result/bin/syslog-client result/bin/syslog-server output
 
       - name: Build release docker image
         run: nix --extra-experimental-features nix-command --extra-experimental-features flakes build '.#docker'
@@ -42,9 +46,9 @@ jobs:
         run: cp result output/docker-image
 
       - run: docker load <result
-      - run: docker tag syslog-utils:latest ghcr.io/${IMAGE_NAME}:latest
-      - run: docker tag syslog-utils:latest ghcr.io/${IMAGE_NAME}:${{ github.ref_name }}
-      - run: docker push ghcr.io/${IMAGE_NAME}:${{ github.ref_name }}
+      - run: docker tag syslog-utils:latest ${{ env.REGISTRY }}/${IMAGE_NAME}:latest
+      - run: docker tag syslog-utils:latest ${{ env.REGISTRY }}/${IMAGE_NAME}:${{ github.ref_name }}
+      - run: docker push ${{ env.REGISTRY }}/${IMAGE_NAME}:${{ github.ref_name }}
 
       - name: Create the release
         uses: softprops/action-gh-release@v2
