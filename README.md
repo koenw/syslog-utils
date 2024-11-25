@@ -11,7 +11,8 @@ will simply print any parsed messages to stdout.
 
 The easiest way to get started is by using the statically compiled release
 binaries or the docker image. Download the *syslog-client* and *syslog-server*
-binaries from the [latest release](/koenw/syslog-utils/releases) page.
+binaries from the [releases](https://github.com/koenw/syslog-utils/releases)
+page.
 
 Run the client with `docker run ghcr.io/koenw/syslog-utils syslog-client` or
 the server with `docker run ghcr.io/koenw/syslog-utils syslog-server`.
