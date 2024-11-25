@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use log::{debug, info, trace, warn};
 use native_tls::TlsAcceptor;
+use std::env;
 use std::io::Read;
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -88,21 +89,31 @@ fn handle_client<S: Read>(mut stream: S, peer: String) {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
 
-    pretty_env_logger::formatted_builder()
-        .filter(None, log::LevelFilter::Info)
-        .parse_env("SYSLOG_SERVER_LOG")
-        .init();
+    if env::var("SYSLOG_SERVER_LOG").is_err() {
+        env::set_var("SYSLOG_SERVER_LOG", "info");
+    }
+    pretty_env_logger::init_custom_env("SYSLOG_SERVER_LOG");
+
+    let address = format!("{}:{}", &opt.address, opt.port);
 
     match opt.transport {
         Transport::udp => {
             todo!();
         }
         Transport::tcp => {
-            let listener = TcpListener::bind(format!("{}:{}", &opt.address, opt.port))
-                .with_context(|| format!("Failed to listen on {}:{}", &opt.address, opt.port))?;
+            debug!("Binding to address {}", &address);
+            let listener = TcpListener::bind(&address)
+                .with_context(|| format!("Failed to listen on {}", &address))?;
 
+            info!("Listening for incoming TCP connections on {address}");
             for stream in listener.incoming() {
-                let stream = stream?;
+                let stream = match stream {
+                    Ok(s) => s,
+                    Err(e) => {
+                        warn!("Failed to accept TCP connection: {e}");
+                        continue;
+                    }
+                };
                 let peer = display_peer!(stream.peer_addr());
                 debug!("Accepted incoming TCP connection from {peer}");
                 thread::spawn(move || {
@@ -116,12 +127,20 @@ fn main() -> Result<()> {
             let identity = identity_from_files(cert_file, key_file)?;
             let acceptor = Arc::new(TlsAcceptor::new(identity)?);
 
-            let listener = TcpListener::bind(format!("{}:{}", &opt.address, opt.port))
-                .with_context(|| format!("Failed to listen on {}:{}", &opt.address, opt.port))?;
+            debug!("Binding to address {}", &address);
+            let listener = TcpListener::bind(&address)
+                .with_context(|| format!("Failed to listen on {}", &address))?;
 
+            info!("Listening for incoming TLS connections on {address}");
             for stream in listener.incoming() {
                 let acceptor = acceptor.clone();
-                let stream = stream?;
+                let stream = match stream {
+                    Ok(s) => s,
+                    Err(e) => {
+                        warn!("Failed to accept TCP connection: {e}");
+                        continue;
+                    }
+                };
 
                 let peer = display_peer!(stream.peer_addr());
                 debug!("Accepted incoming TLS connection from {peer}");
