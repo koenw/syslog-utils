@@ -15,7 +15,17 @@
           inherit system;
         };
 
-        toolchain = with fenix.packages.${system}; combine [
+        # Toolchain for use in development shell
+        toolchainFull = with fenix.packages.${system}; combine [
+          complete.rustc
+          complete.cargo
+          complete.clippy
+          complete.rustfmt
+          targets.x86_64-unknown-linux-musl.latest.rust-std
+        ];
+
+        # Toolchain to build static binaries
+        toolchainStatic = with fenix.packages.${system}; combine [
           minimal.rustc
           minimal.cargo
           targets.x86_64-unknown-linux-musl.latest.rust-std
@@ -24,8 +34,14 @@
         naersk' = pkgs.callPackage naersk {};
 
         naerskStatic = naersk.lib.${system}.override {
-          cargo = toolchain;
-          rustc = toolchain;
+          cargo = toolchainStatic;
+          rustc = toolchainStatic;
+        };
+
+        naerskDev = naersk.lib.${system}.override {
+          cargo = toolchainFull;
+          rustc = toolchainFull;
+          clippy = toolchainFull;
         };
 
         staticPackage = naerskStatic.buildPackage {
@@ -43,8 +59,16 @@
         nativePackage = naersk'.buildPackage {
           src = ./.;
           nativeBuildInputs = with pkgs; [
-            pkgsStatic.stdenv.cc
-            pkgsStatic.openssl
+            stdenv.cc
+            openssl
+          ];
+        };
+
+        devPackage = naerskDev.buildPackage {
+          src = ./.;
+          nativeBuildInputs = with pkgs; [
+            stdenv.cc
+            openssl
           ];
         };
 
@@ -80,24 +104,6 @@
           };
         };
       in rec {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            rust-bin.stable.latest.default
-            gcc
-            pkg-config
-            openssl
-            just
-          ];
-          shellHook = ''
-            user_shell=$(getent passwd "$(whoami)" |cut -d: -f 7)
-
-            just --color=always -l |awk '/^Available recipes:/ gsub(/Available rescipes:/, "The following `just` commands are available:")'
-
-            exec "$user_shell"
-
-          '';
-        };
-
         packages = {
           # Statically linked
           static = staticPackage;
@@ -106,13 +112,29 @@
 
           # For `nix run '.#client'`
           client = client;
+          syslog-client = client;
           # For `nix run '.#server'`
           server = server;
+          syslog-server = server;
           # For `nix run` or `nix run .`
           default = client;
 
           # The docker image contains both binaries
           docker = dockerImage;
+        };
+
+        devShells.default = pkgs.mkShell {
+          inputsFrom = with packages; [ devPackage ];
+          buildInputs = with pkgs; [
+            just
+          ];
+          shellHook = ''
+            user_shell=$(getent passwd "$(whoami)" |cut -d: -f 7)
+
+            just --color=always -l |awk '/^Available recipes:/ gsub(/^Available recipes:/, "The Following `just` commands are available:")'
+
+            exec "$user_shell"
+          '';
         };
       }
     );
