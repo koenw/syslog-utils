@@ -1,12 +1,12 @@
 ---
-name: "Build & publish artifacts"
+name: "Build & publish binaries"
+
 on:
   push
 
-
 jobs:
-  publish_binaries:
-    name: Build & publish artifacts
+  build-binaries:
+    name: Build & publish binaries
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo

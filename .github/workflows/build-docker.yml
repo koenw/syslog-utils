@@ -1,18 +1,15 @@
 ---
 name: "Build & publish docker image"
-on:
-  push:
-    tags:
-      - 'v*'
 
+on:
+  push
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-
 jobs:
-  publish_docker_image:
+  build-docker-image:
     name: Build & publish docker image to the GitHub container registry
     runs-on: ubuntu-latest
     steps:
@@ -33,6 +30,5 @@ jobs:
 
       - run: nix --extra-experimental-features nix-command --extra-experimental-features flakes build '.#docker'
       - run: docker load <result
-      - run: docker tag syslog-utils:latest ghcr.io/${IMAGE_NAME}:latest
-      - run: docker tag syslog-utils:latest ghcr.io/${IMAGE_NAME}:${{ github.ref_name }}
-      - run: docker push ghcr.io/${IMAGE_NAME}:latest
+      - run: docker tag syslog-utils:latest ${{ env.REGISTRY }}/${IMAGE_NAME}:latest
+      - run: docker push ${{ env.REGISTRY }}/${IMAGE_NAME}:latest
