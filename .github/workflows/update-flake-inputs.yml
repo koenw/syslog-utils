@@ -18,7 +18,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
       - run: nix --extra-experimental-features nix-command --extra-experimental-features flakes build '.#static'
 
-      - run: nix flake update --commit-lock-file
+      - run: nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update --commit-lock-file
 
       - uses: peter-evans/create-pull-request@v3
         with:
