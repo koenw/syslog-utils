@@ -9,7 +9,7 @@ name = "utils"
 path = "src/lib.rs"
 
 [dependencies]
-anyhow = "1.0.93"
+anyhow = "1.0.95"
 fasyslog = { git = "https://github.com/koenw/fasyslog.git", rev = "805e4497b5bdc87acf570c69765363215946289e", features = ["native-tls"] }
 log = { version = "0.4.22", features = ["kv", "kv_std"] }
 native-tls = "0.2.12"
