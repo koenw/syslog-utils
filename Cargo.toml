@@ -11,7 +11,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1.0.93"
 fasyslog = { git = "https://github.com/koenw/fasyslog.git", rev = "805e4497b5bdc87acf570c69765363215946289e", features = ["native-tls"] }
-log = { version = "0.4.22", features = ["kv", "kv_std"] }
+log = { version = "0.4.26", features = ["kv", "kv_std"] }
 native-tls = "0.2.12"
 openssl = "0.10.68"
 pretty_env_logger = "0.5.0"
