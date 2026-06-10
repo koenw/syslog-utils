@@ -28,6 +28,10 @@
         toolchainStatic = with fenix.packages.${system}; combine [
           minimal.rustc
           minimal.cargo
+          (pkgs.openssl.override {
+            static = true;
+          }).dev
+          pkgs.pkg-config
           targets.x86_64-unknown-linux-musl.latest.rust-std
         ];
 
@@ -48,20 +52,33 @@
           src = ./.;
           nativeBuildInputs = with pkgs; [
             pkgsStatic.stdenv.cc
-            pkgsStatic.openssl
+            #pkgsStatic.openssl
+            perl
+            (pkgs.openssl.override {
+              static = true;
+            }).dev
           ];
+          buildInputs = [
+            (pkgs.openssl.override {
+              static = true;
+            }).dev
+          ];
+          OPENSSL_STATIC = "yes";
+          OPENSSL_LIB_DIR = pkgs.lib.makeLibraryPath [ pkgs.openssl.dev ];
           CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
           # Tell Cargo to enable static compilation.
           # (https://doc.rust-lang.org/cargo/reference/config.html#buildrustflags)
           CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
         };
 
-        nativePackage = naersk'.buildPackage {
+        syslog-utils = naersk'.buildPackage {
           src = ./.;
           nativeBuildInputs = with pkgs; [
             stdenv.cc
             openssl
+            perl
           ];
+          buildInputs = with pkgs; [ pkg-config ];
         };
 
         devPackage = naerskDev.buildPackage {
@@ -69,7 +86,9 @@
           nativeBuildInputs = with pkgs; [
             stdenv.cc
             openssl
+            perl
           ];
+          buildInputs = with pkgs; [ pkg-config ];
         };
 
         # With explicit binary name for `nix run` (all packages contain both
@@ -80,6 +99,7 @@
           nativeBuildInputs = with pkgs; [
             pkgsStatic.stdenv.cc
             pkgsStatic.openssl
+            perl
           ];
         };
 
@@ -91,6 +111,7 @@
           nativeBuildInputs = with pkgs; [
             pkgsStatic.stdenv.cc
             pkgsStatic.openssl
+            perl
           ];
         };
 
@@ -99,16 +120,16 @@
           tag = "latest";
           config = {
             Env = [
-              "PATH=${staticPackage}/bin"
+              "PATH=${syslog-utils}/bin"
             ];
           };
         };
       in rec {
         packages = {
+          syslog-utils = syslog-utils;
+
           # Statically linked
-          static = staticPackage;
-          # Dynamically linked
-          native = nativePackage;
+          #static = staticPackage;
 
           # For `nix run '.#client'`
           client = client;
@@ -116,6 +137,7 @@
           # For `nix run '.#server'`
           server = server;
           syslog-server = server;
+
           # For `nix run` or `nix run .`
           default = client;
 
@@ -125,6 +147,9 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = with packages; [ devPackage ];
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.openssl ];
+
           buildInputs = with pkgs; [
             just
           ];
