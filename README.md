@@ -7,15 +7,38 @@ servers or simply to send syslog messages. The server supports TCP and TLS and
 will simply print any parsed messages to stdout.
 
 
-## Getting Started
+## Installation
 
-The easiest way to get started is by using the statically compiled release
-binaries or the docker image. Download the *syslog-client* and *syslog-server*
+### NixOS
+
+With flakes enabled you can run the client directly as such:
+
+`nix run github:koenw/syslog-utils syslog-client`
+
+same for the server:
+
+`nix run github:koenw/syslog-utils syslog-server`
+
+
+### Statically compiled binaries
+
+*syslog-client* and *syslog-server* are available as statically compiled
 binaries from the [releases](https://github.com/koenw/syslog-utils/releases)
 page.
 
-Run the client with `docker run ghcr.io/koenw/syslog-utils syslog-client` or
-the server with `docker run ghcr.io/koenw/syslog-utils syslog-server`.
+
+### Docker
+
+```sh
+# Or build locally using `nix build '.#docker' && docker load <result`
+docker pull ghcr.io/koenw/syslog-utils
+
+# Run the client
+docker run -ti syslog-utils syslog-client
+
+# Run the server
+docker run -ti syslog-utils syslog-server
+```
 
 
 ## Usage
@@ -25,6 +48,15 @@ the server with `docker run ghcr.io/koenw/syslog-utils syslog-server`.
 
 Simple command line syslog client to send RFC5424 or RFC3164 messages over UDP,
 TCP or TLS.
+
+
+#### Examples
+
+| Command | Description |
+| --- | --- |
+| `syslog-client tcp --port 5014 --format rfc5424 --sd-elements="key=value,nothing=equal" hello` | Send the message "hello" to port 5014, with RFC5424 Structured Data |
+| `syslog-client tls --host syslog.example.com --stdin` | Read messages on stdin and send them over TLS to syslog.example.com |
+| `syslog-client tls --accept-invalid-certs hello` | Send messages over TLS, ignoring certificate errors |
 
 
 #### Help
@@ -67,16 +99,14 @@ ARGS:
 ```
 
 
+### syslog-server
+
 #### Examples
 
 | Command | Description |
 | --- | --- |
-| `syslog-client tcp --port 5014 --format rfc5424 --sd-elements="key=value,nothing=equal" hello` | Send the message "hello" to port 5014, with RFC5424 Structured Data |
-| `syslog-client tls --host syslog.example.com --stdin` | Read messages on stdin and send them over TLS to syslog.example.com |
-| `syslog-client tls --accept-invalid-certs hello` | Send messages over TLS, ignoring certificate errors |
-
-
-### syslog-server
+| `syslog-server tls --cert cert.pem --key.pem --port 5014` | Listen for TLS connections on port 5014 using the given key & certificate |
+| `SYSLOG_SERVER_LOG=debug syslog-server tcp --port 5014` | Listen for TCP connection on port 5014, being extra verbose about it |
 
 
 #### Help
@@ -122,14 +152,6 @@ ARGS:
 ```
 
 
-#### Examples
-
-| Command | Description |
-| --- | --- |
-| `syslog-server tls --cert cert.pem --key.pem --port 5014` | Listen for TLS connections on port 5014 using the given key & certificate |
-| `SYSLOG_SERVER_LOG=debug syslog-server tcp --port 5014` | Listen for TCP connection on port 5014, being extra verbose about it |
-
-
 ## Development
 
 Run `nix develop` for a development shell.
@@ -137,7 +159,7 @@ Run `nix develop` for a development shell.
 | Command | Description |
 | --- | --- |
 | `nix develop` | Development shell including all dependencies |
+| `nix build` | Build (dynamically linked) binaries |
+| `nix build '.#static'` | Build (statically linked) binaries |
 | `nix build '.#docker' && docker load <result` | Build and load a docker image |
-| `nix build '.#static'` | Build static (musl) binaries |
-| `nix build '.#native'` | Build dynamically linked binaries |
 | `just gen-selfsigned-cert` | Generate a self-signed certificate for use with the TLS server |
