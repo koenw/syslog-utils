@@ -28,10 +28,6 @@
         toolchainStatic = with fenix.packages.${system}; combine [
           minimal.rustc
           minimal.cargo
-          (pkgs.openssl.override {
-            static = true;
-          }).dev
-          pkgs.pkg-config
           targets.x86_64-unknown-linux-musl.latest.rust-std
         ];
 
@@ -42,46 +38,24 @@
           rustc = toolchainStatic;
         };
 
-        naerskDev = naersk.lib.${system}.override {
-          cargo = toolchainFull;
-          rustc = toolchainFull;
-          clippy = toolchainFull;
-        };
-
         staticPackage = naerskStatic.buildPackage {
           src = ./.;
+
           nativeBuildInputs = with pkgs; [
-            pkgsStatic.stdenv.cc
-            #pkgsStatic.openssl
             perl
-            (pkgs.openssl.override {
-              static = true;
-            }).dev
+            pkg-config
           ];
-          buildInputs = [
-            (pkgs.openssl.override {
-              static = true;
-            }).dev
+          buildInputs = with pkgs; [
+            pkgsStatic.openssl
           ];
-          OPENSSL_STATIC = "yes";
-          OPENSSL_LIB_DIR = pkgs.lib.makeLibraryPath [ pkgs.openssl.dev ];
+
           CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
-          # Tell Cargo to enable static compilation.
-          # (https://doc.rust-lang.org/cargo/reference/config.html#buildrustflags)
           CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+          CC_x86_64-unknown-linux-musl = with pkgs.pkgsStatic.stdenv; "${cc}/bin/${cc.targetPrefix}gcc";
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = with pkgs.pkgsStatic.stdenv; "${cc}/bin/${cc.targetPrefix}gcc";
         };
 
         syslog-utils = naersk'.buildPackage {
-          src = ./.;
-          nativeBuildInputs = with pkgs; [
-            stdenv.cc
-            openssl
-            perl
-          ];
-          buildInputs = with pkgs; [ pkg-config ];
-        };
-
-        devPackage = naerskDev.buildPackage {
           src = ./.;
           nativeBuildInputs = with pkgs; [
             stdenv.cc
@@ -115,6 +89,40 @@
           ];
         };
 
+        naerskDev = naersk.lib.${system}.override {
+          cargo = toolchainFull;
+          rustc = toolchainFull;
+          clippy = toolchainFull;
+        };
+
+        devPackage = naerskDev.buildPackage {
+          src = ./.;
+          nativeBuildInputs = with pkgs; [
+            stdenv.cc
+            openssl
+            perl
+          ];
+          buildInputs = with pkgs; [ pkg-config ];
+        };
+
+
+        check-all = naerskDev.buildPackage {
+          src = ./.;
+          name = "check-all";
+          nativeBuildInputs = with pkgs; [
+            pkgsStatic.stdenv.cc
+            pkgsStatic.openssl
+            perl
+          ];
+          fixupPhase = ''
+            # Make sure we fail on all warnings, including Clippy lints
+            export RUSTFLAGS="-Dwarnings"
+            cargo fmt --check
+            cargo clippy --no-deps
+            cargo test
+          '';
+        };
+
         dockerImage = pkgs.dockerTools.buildImage {
           name = "syslog-utils";
           tag = "latest";
@@ -125,15 +133,20 @@
           };
         };
       in rec {
+        checks = {
+          default = check-all;
+        };
+
         packages = {
           syslog-utils = syslog-utils;
 
           # Statically linked
-          #static = staticPackage;
+          static = staticPackage;
 
           # For `nix run '.#client'`
           client = client;
           syslog-client = client;
+
           # For `nix run '.#server'`
           server = server;
           syslog-server = server;
@@ -153,6 +166,7 @@
           buildInputs = with pkgs; [
             just
           ];
+
           shellHook = ''
             user_shell=$(getent passwd "$(whoami)" |cut -d: -f 7)
 
