@@ -941,6 +941,7 @@ dependencies = [
  "fasyslog",
  "log",
  "native-tls",
+ "openssl",
  "pretty_env_logger",
  "structopt",
  "syslog_loose",
