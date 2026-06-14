@@ -9,25 +9,29 @@ will simply print any parsed messages to stdout.
 
 ## Installation
 
-### NixOS
+<details>
+    <summary>Nix Flakes</summary>
 
-With flakes enabled you can run the client directly as such:
+Run the client directly like this:
 
 `nix run github:koenw/syslog-utils syslog-client`
 
-same for the server:
+or for the server:
 
 `nix run github:koenw/syslog-utils syslog-server`
+</details>
 
+<details>
+    <summary>Statically compiled binaries</summary>
 
-### Statically compiled binaries
-
-*syslog-client* and *syslog-server* are available as statically compiled
+**syslog-client** and **syslog-server** are available as statically compiled
 binaries from the [releases](https://github.com/koenw/syslog-utils/releases)
 page.
 
+</details>
 
-### Docker
+<details>
+    <summary>Docker</summary>
 
 ```sh
 # Or build locally using `nix build '.#docker' && docker load <result`
@@ -39,6 +43,7 @@ docker run -ti syslog-utils syslog-client
 # Run the server
 docker run -ti syslog-utils syslog-server
 ```
+</details>
 
 
 ## Usage
