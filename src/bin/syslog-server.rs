@@ -94,16 +94,16 @@ fn main() -> Result<()> {
     }
     pretty_env_logger::init_custom_env("SYSLOG_SERVER_LOG");
 
-    let address = format!("{}:{}", &opt.address, opt.port);
+    let address = format!("{}:{}", opt.address, opt.port);
 
     match opt.transport {
         Transport::udp => {
             todo!();
         }
         Transport::tcp => {
-            debug!("Binding to address {}", &address);
+            debug!("Binding to address {}", address);
             let listener = TcpListener::bind(&address)
-                .with_context(|| format!("Failed to listen on {}", &address))?;
+                .with_context(|| format!("Failed to listen on {}", address))?;
 
             info!("Listening for incoming TCP connections on {address}");
             for stream in listener.incoming() {
@@ -127,9 +127,9 @@ fn main() -> Result<()> {
             let identity = identity_from_files(cert_file, key_file)?;
             let acceptor = Arc::new(TlsAcceptor::new(identity)?);
 
-            debug!("Binding to address {}", &address);
+            debug!("Binding to address {}", address);
             let listener = TcpListener::bind(&address)
-                .with_context(|| format!("Failed to listen on {}", &address))?;
+                .with_context(|| format!("Failed to listen on {}", address))?;
 
             info!("Listening for incoming TLS connections on {address}");
             for stream in listener.incoming() {

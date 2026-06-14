@@ -73,7 +73,7 @@ pub fn identity_from_files<C: AsRef<Path>, K: AsRef<Path>>(
     let mut key = vec![];
     key_file
         .read_to_end(&mut key)
-        .with_context(|| format!("Failed to read private key {}", &key_path.display()))?;
+        .with_context(|| format!("Failed to read private key {}", key_path.display()))?;
 
     let identity = Identity::from_pkcs8(&cert, &key).with_context(|| {
         format!(
